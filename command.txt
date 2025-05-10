@@ -1,0 +1,2 @@
+python scripts/rsl_rl/toss_train.py --task Isaac-Toss-Object-Franka-v0 --num_envs 1000
+
