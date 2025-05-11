@@ -165,46 +165,46 @@ class RewardsCfg:
 
     reaching_object = RewTerm(func=mdp.object_ee_distance, params={"std": 0.1}, weight=2.0)
 
-    # lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=15.0)
+    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=15.0)
 
-    # object_goal_tracking = RewTerm(
-    #     func=mdp.object_goal_distance,
-    #     params={"std": 0.3, "minimal_height": 0.04, "command_name": "object_pose"},
-    #     weight=16.0,
+    object_goal_tracking = RewTerm(
+        func=mdp.object_goal_distance,
+        params={"std": 0.3, "minimal_height": 0.04, "command_name": "object_pose"},
+        weight=16.0,
+    )
+
+    object_goal_tracking_fine_grained = RewTerm(
+        func=mdp.object_goal_distance,
+        params={"std": 0.05, "minimal_height": 0.04, "command_name": "object_pose"},
+        weight=5.0,
+    )
+
+
+    # # Phase I: explicit lift bonus to bootstrap grasp
+    # lift_bonus = RewTerm(
+    #     func=mdp.object_is_lifted,
+    #     params={"minimal_height": 0.04},
+    #     weight=5.0
     # )
 
-    # object_goal_tracking_fine_grained = RewTerm(
-    #     func=mdp.object_goal_distance,
-    #     params={"std": 0.05, "minimal_height": 0.04, "command_name": "object_pose"},
-    #     weight=5.0,
+    # # Phase II: throw accuracy (dense penalty) + success bonus (sparse)
+    # accuracy = RewTerm(
+    #     func=mdp.acc_term,
+    #     params={"k_acc": 2.0},
+    #     weight=1.0
+    # )
+    # success = RewTerm(
+    #     func=mdp.success_bonus,
+    #     params={"eps": 0.04},
+    #     weight=100.0
     # )
 
-
-    # Phase I: explicit lift bonus to bootstrap grasp
-    lift_bonus = RewTerm(
-        func=mdp.object_is_lifted,
-        params={"minimal_height": 0.04},
-        weight=5.0
-    )
-
-    # Phase II: throw accuracy (dense penalty) + success bonus (sparse)
-    accuracy = RewTerm(
-        func=mdp.acc_term,
-        params={"k_acc": 2.0},
-        weight=1.0
-    )
-    success = RewTerm(
-        func=mdp.success_bonus,
-        params={"eps": 0.04},
-        weight=100.0
-    )
-
-    # Smoothness regulariser (small penalty on joint velocities)
-    smoothness = RewTerm(
-        func=mdp.energy_penalty,
-        params={"alpha": 1e-6},
-        weight=1.0
-    )
+    # # Smoothness regulariser (small penalty on joint velocities)
+    # smoothness = RewTerm(
+    #     func=mdp.energy_penalty,
+    #     params={"alpha": 1e-6},
+    #     weight=1.0
+    # )
 
     # action penalty
     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-1e-4)
@@ -227,10 +227,10 @@ class TerminationsCfg:
         func=mdp.root_height_below_minimum, params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("object")}
     )
 
-    goal_reached = DoneTerm(
-       func=mdp.object_in_square_basket,
-       params={"half_extents": (0.5, 0.5)}  # adjust to match your basket’s inner dimensions
-   )
+#     goal_reached = DoneTerm(
+#        func=mdp.object_in_square_basket,
+#        params={"half_extents": (0.5, 0.5)}  # adjust to match your basket’s inner dimensions
+#    )
 
 
 @configclass
@@ -256,7 +256,7 @@ class LiftEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the lifting environment."""
 
     # Scene settings
-    scene: ObjectTableSceneCfg = ObjectTableSceneCfg(num_envs=1, env_spacing=8.0)
+    scene: ObjectTableSceneCfg = ObjectTableSceneCfg(num_envs=4096, env_spacing=8.0)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
