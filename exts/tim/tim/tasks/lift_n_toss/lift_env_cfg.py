@@ -187,24 +187,24 @@ class RewardsCfg:
     #     weight=5.0
     # )
 
-    # Phase II: throw accuracy (dense penalty) + success bonus (sparse)
-    accuracy = RewTerm(
-        func=mdp.acc_term,
-        params={"k_acc": 2.0},
-        weight=1.0
-    )
-    success = RewTerm(
-        func=mdp.success_bonus,
-        params={"eps": 0.04},
-        weight=100.0
-    )
+    # # Phase II: throw accuracy (dense penalty) + success bonus (sparse)
+    # accuracy = RewTerm(
+    #     func=mdp.acc_term,
+    #     params={"k_acc": 2.0},
+    #     weight=1.0
+    # )
+    # success = RewTerm(
+    #     func=mdp.success_bonus,
+    #     params={"eps": 0.04},
+    #     weight=100.0
+    # )
 
-    # Smoothness regulariser (small penalty on joint velocities)
-    smoothness = RewTerm(
-        func=mdp.energy_penalty,
-        params={"alpha": 1e-6},
-        weight=1.0
-    )
+    # # Smoothness regulariser (small penalty on joint velocities)
+    # smoothness = RewTerm(
+    #     func=mdp.energy_penalty,
+    #     params={"alpha": 1e-6},
+    #     weight=1.0
+    # )
 
     # action penalty
     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-1e-4)
@@ -215,19 +215,6 @@ class RewardsCfg:
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
-     # accuracy:  −k_acc * ||p_final − p_goal||²
-    accuracy = RewTerm(
-        func=mdp.acc_term,
-        params={"k_acc": 1.0},            # no extra params
-        weight=1.0        # penalty
-    )
-
-    # success:  +b_succ * 1{dist < eps}
-    success = RewTerm(
-        func=mdp.success_bonus,
-        params={"eps": 0.04},  # the radius of the basket (4cm)
-        weight=100.0        # positive bonus
-    )
 
 
 @configclass
@@ -240,10 +227,10 @@ class TerminationsCfg:
         func=mdp.root_height_below_minimum, params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("object")}
     )
 
-    goal_reached = DoneTerm(
-       func=mdp.object_in_square_basket,
-       params={"half_extents": (0.5, 0.5)}  # adjust to match your basket’s inner dimensions
-   )
+#     goal_reached = DoneTerm(
+#        func=mdp.object_in_square_basket,
+#        params={"half_extents": (0.5, 0.5)}  # adjust to match your basket’s inner dimensions
+#    )
 
 
 @configclass
@@ -269,7 +256,7 @@ class LiftEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the lifting environment."""
 
     # Scene settings
-    scene: ObjectTableSceneCfg = ObjectTableSceneCfg(num_envs=1, env_spacing=8.0)
+    scene: ObjectTableSceneCfg = ObjectTableSceneCfg(num_envs=4096, env_spacing=8.0)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
@@ -284,7 +271,7 @@ class LiftEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 2
-        self.episode_length_s = 5.0
+        self.episode_length_s = 12.0
         # simulation settings
         self.sim.dt = 0.01  # 100Hz
         self.sim.render_interval = self.decimation
