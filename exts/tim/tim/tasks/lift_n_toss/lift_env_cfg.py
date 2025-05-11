@@ -163,7 +163,7 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
-    # reaching_object = RewTerm(func=mdp.object_ee_distance, params={"std": 0.1}, weight=1.0)
+    reaching_object = RewTerm(func=mdp.object_ee_distance, params={"std": 0.1}, weight=2.0)
 
     # lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=15.0)
 
@@ -215,19 +215,6 @@ class RewardsCfg:
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
-     # accuracy:  −k_acc * ||p_final − p_goal||²
-    accuracy = RewTerm(
-        func=mdp.acc_term,
-        params={"k_acc": 1.0},            # no extra params
-        weight=1.0        # penalty
-    )
-
-    # success:  +b_succ * 1{dist < eps}
-    success = RewTerm(
-        func=mdp.success_bonus,
-        params={"eps": 0.04},  # the radius of the basket (4cm)
-        weight=100.0        # positive bonus
-    )
 
 
 @configclass
@@ -284,7 +271,7 @@ class LiftEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 2
-        self.episode_length_s = 5.0
+        self.episode_length_s = 12.0
         # simulation settings
         self.sim.dt = 0.01  # 100Hz
         self.sim.render_interval = self.decimation
