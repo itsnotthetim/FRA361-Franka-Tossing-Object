@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2024, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -42,15 +42,20 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # target object: will be populated by agent env cfg
     object: RigidObjectCfg | DeformableObjectCfg = MISSING
 
-    # basket (target)
-    basket: RigidObjectCfg | DeformableObjectCfg = MISSING
+    # Stage Target
+    stage_target = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/stage_target",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[2.15, 0, -0.525], rot=[0.0, 0, 0, 0.0]),
+        spawn=UsdFileCfg(usd_path="exts/tim/tim/tasks/lift_n_toss/config/franka/mesh/target_plane.usd",
+                         scale=(2.0, 2.0, 1.05)) 
+    )
 
     # Table
     table = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/Table",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[1.7, 0, 0], rot=[0.707, 0, 0, 0.707]),
-        spawn=UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/SeattleLabTable/table_instanceable.usd",
-                         scale = (3.0, 3.0, 1.0)),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.5, 0, 0], rot=[0.707, 0, 0, 0.707]),
+        spawn=UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/SeattleLabTable/table_instanceable.usd"
+                         ,) ## Add scale for testing,
     )
 
     # plane
@@ -66,6 +71,9 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
 
+
+    #  basket (target) for testing
+    basket: RigidObjectCfg | DeformableObjectCfg = MISSING
 
 ##
 # MDP settings
@@ -108,11 +116,11 @@ class ObservationsCfg:
         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
         object_position = ObsTerm(func=mdp.object_position_in_robot_root_frame)
         target_object_position = ObsTerm(func=mdp.generated_commands, params={"command_name": "object_pose"})
-
-        gripper_closed = ObsTerm(func=mdp.gripper_status)
-        delta_ee_goal  = ObsTerm(func=mdp.ee_to_goal)
-        basket_root_pos_w = ObsTerm(func=mdp.basket_root_pos_w)      # (N,3)    
         actions = ObsTerm(func=mdp.last_action)
+
+        ## Add for test
+        gripper_closed = ObsTerm(func=mdp.gripper_status)
+        delta_ee_goal  = ObsTerm(func=mdp.ee_to_goal)     # (N,3)  
 
         def __post_init__(self):
             self.enable_corruption = True
@@ -126,16 +134,6 @@ class ObservationsCfg:
 class EventCfg:
     """Configuration for events."""
 
-    set_object_mass = EventTerm(
-        func=mdp.randomize_rigid_body_mass,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("basket", body_names=["Cube_006"]),
-            "mass_distribution_params": (3.0, 3.0),  # fixed mass explicitly at 1.5 kg
-            "operation": "abs",  # correctly set absolute mass
-        },
-    )
-
     reset_all = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
 
     reset_object_position = EventTerm(
@@ -147,16 +145,6 @@ class EventCfg:
             "asset_cfg": SceneEntityCfg("object", body_names="Object"),
         },
     )
-
-    # reset_basket_position = EventTerm(
-    #     func=mdp.reset_root_state_uniform,
-    #     mode="reset",
-    #     params={
-    #         "pose_range": {"x": (-0.3, 0.3), "y": (-0.8, 0.5), "z": (0.0, 0.0)} , #{"x": (-0.1, 0.1), "y": (-0.25, 0.25), "z": (0.0, 0.0)}
-    #         "velocity_range": {},
-    #         "asset_cfg": SceneEntityCfg("basket", body_names="Cube_006"),
-    #     },
-    # )
 
 
 @configclass
@@ -179,33 +167,6 @@ class RewardsCfg:
         weight=5.0,
     )
 
-
-    # # Phase I: explicit lift bonus to bootstrap grasp
-    # lift_bonus = RewTerm(
-    #     func=mdp.object_is_lifted,
-    #     params={"minimal_height": 0.04},
-    #     weight=5.0
-    # )
-
-    # # Phase II: throw accuracy (dense penalty) + success bonus (sparse)
-    # accuracy = RewTerm(
-    #     func=mdp.acc_term,
-    #     params={"k_acc": 2.0},
-    #     weight=1.0
-    # )
-    # success = RewTerm(
-    #     func=mdp.success_bonus,
-    #     params={"eps": 0.04},
-    #     weight=100.0
-    # )
-
-    # # Smoothness regulariser (small penalty on joint velocities)
-    # smoothness = RewTerm(
-    #     func=mdp.energy_penalty,
-    #     params={"alpha": 1e-6},
-    #     weight=1.0
-    # )
-
     # action penalty
     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-1e-4)
 
@@ -214,7 +175,6 @@ class RewardsCfg:
         weight=-1e-4,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
-
 
 
 @configclass
@@ -226,11 +186,6 @@ class TerminationsCfg:
     object_dropping = DoneTerm(
         func=mdp.root_height_below_minimum, params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("object")}
     )
-
-#     goal_reached = DoneTerm(
-#        func=mdp.object_in_square_basket,
-#        params={"half_extents": (0.5, 0.5)}  # adjust to match your basket’s inner dimensions
-#    )
 
 
 @configclass
@@ -256,7 +211,7 @@ class LiftEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the lifting environment."""
 
     # Scene settings
-    scene: ObjectTableSceneCfg = ObjectTableSceneCfg(num_envs=4096, env_spacing=8.0)
+    scene: ObjectTableSceneCfg = ObjectTableSceneCfg(num_envs=4096, env_spacing=6.0) ## Edit env_spacing from 2.5 default
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
@@ -271,7 +226,7 @@ class LiftEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 2
-        self.episode_length_s = 12.0
+        self.episode_length_s = 5.0
         # simulation settings
         self.sim.dt = 0.01  # 100Hz
         self.sim.render_interval = self.decimation

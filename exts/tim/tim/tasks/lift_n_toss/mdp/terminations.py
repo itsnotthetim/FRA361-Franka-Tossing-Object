@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2024, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -51,66 +51,3 @@ def object_reached_goal(
 
     # rewarded if the object is lifted above the threshold
     return distance < threshold
-
-
-# def object_in_basket(
-#     env: ManagerBasedRLEnv,
-#     object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
-#     basket_cfg: SceneEntityCfg = SceneEntityCfg("basket"),
-#     threshold: float = 0.05,
-# ) -> torch.Tensor:
-#     """
-#     Terminate when the object’s centre is within `threshold` meters of the basket’s centre.
-
-#     Args:
-#         env: the IsaacLab RL environment
-#         object_cfg: SceneEntityCfg for the cube
-#         basket_cfg: SceneEntityCfg for the basket prim
-#         threshold: radius around basket centre signifying “in basket”
-#     Returns:
-#         mask of shape (num_envs,) where True indicates termination
-#     """
-#     obj: RigidObject    = env.scene[object_cfg.name]
-#     basket: RigidObject = env.scene[basket_cfg.name]
-#     # world‐frame centres, shape (N,3)
-#     p_obj    = obj.data.root_pos_w[:, :3]
-#     p_basket = basket.data.root_pos_w[:, :3]
-#     # compute Euclidean distance
-#     dist = torch.norm(p_obj - p_basket, dim=1)
-#     # terminate when inside basket radius
-#     return dist < threshold
-
-
-def object_in_square_basket(
-    env: ManagerBasedRLEnv,
-    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
-    basket_cfg: SceneEntityCfg = SceneEntityCfg("basket"),
-    half_extents: Tuple[float, float] = (0.10, 0.12),
-) -> torch.Tensor:
-    """
-    Terminate when the object’s centre is within the square basket area.
-
-    Args:
-        env: The IsaacLab RL environment.
-        object_cfg: SceneEntityCfg for the cube.
-        basket_cfg: SceneEntityCfg for the basket prim.
-        half_extents: (hx, hy) half-widths of the basket in its local x/y axes.
-    Returns:
-        mask of shape (num_envs,) where True indicates the object is inside the square.
-    """
-    # Fetch object & basket world positions
-    obj: RigidObject    = env.scene[object_cfg.name]
-    basket: RigidObject = env.scene[basket_cfg.name]
-    p_obj    = obj.data.root_pos_w[:, :3]       # (N,3)
-    p_basket = basket.data.root_pos_w[:, :3]    # (N,3)
-
-    # Compute delta in world frame
-    delta = p_obj - p_basket                     # (N,3)
-    dx, dy = delta[:, 0], delta[:, 1]
-
-    # Check square bounds: |dx| < hx AND |dy| < hy
-    hx, hy = half_extents
-    inside_x = torch.abs(dx) < hx
-    inside_y = torch.abs(dy) < hy
-
-    return inside_x & inside_y

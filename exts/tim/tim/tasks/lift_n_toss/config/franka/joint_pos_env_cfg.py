@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2024, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -25,7 +25,6 @@ if tim_path not in sys.path:
 # Now use the absolute import
 from tim.tasks.lift_n_toss.lift_env_cfg import LiftEnvCfg
 from tim.tasks.lift_n_toss import mdp
-
 
 ##
 # Pre-defined configs
@@ -74,7 +73,7 @@ class FrankaCubeLiftEnvCfg(LiftEnvCfg):
             ),
         )
 
-        # Set the basket (target) as object
+        # Add for testing
         self.scene.basket = RigidObjectCfg(
                 prim_path="{ENV_REGEX_NS}/BasketObject",
                 init_state=RigidObjectCfg.InitialStateCfg(
@@ -82,7 +81,7 @@ class FrankaCubeLiftEnvCfg(LiftEnvCfg):
                     rot=[1, 0, 0, 0]
                 ),
                 spawn=UsdFileCfg(
-                    usd_path="exts/tim/tim/tasks/lift_n_toss/config/franka/mesh/basket.usd",
+                    usd_path="exts/tim/tim/tasks/lift_n_toss/config/franka/basket.usd",
                     scale=(0.1, 0.1, 0.1),
                     rigid_props=RigidBodyPropertiesCfg(
                         solver_position_iteration_count=16,

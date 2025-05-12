@@ -64,7 +64,8 @@ def main():
     print(current_dir)
     env_cfg = FrankaCubeLiftEnvCfg()
     
-    env_cfg.scene.num_envs = 1
+    env_cfg.scene.num_envs = 10
+    env_cfg.scene.env_spacing = 6.0
     env = ManagerBasedRLEnv(cfg=env_cfg)
     env.reset()
 

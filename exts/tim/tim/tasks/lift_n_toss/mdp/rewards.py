@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2024, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -65,42 +65,3 @@ def object_goal_distance(
     distance = torch.norm(des_pos_w - object.data.root_pos_w[:, :3], dim=1)
     # rewarded if the object is lifted above the threshold
     return (object.data.root_pos_w[:, 2] > minimal_height) * (1 - torch.tanh(distance / std))
-
-
-## Tossing
-
-def acc_term(env: ManagerBasedRLEnv, k_acc: float) -> torch.Tensor:
-    """
-    Accuracy term: −k_acc * ||p_final − p_goal||^2, but only applied at the final timestep.
-    """
-    # final object position in world frame
-    final_pos = env.scene["object"].data.root_state_w[:, :3]
-    # basket goal position in world frame
-    goal_pos = env.scene["basket"].data.root_state_w[:, :3]
-    # squared error
-    err2 = torch.sum((final_pos - goal_pos) ** 2, dim=-1)
-
-    # get a (N,) bool tensor which envs just terminated
-    done = env.termination_manager.dones
-
-    # apply the penalty only for envs where done==True
-    return torch.where(done, -k_acc * err2, torch.zeros_like(err2))
-
-
-def success_bonus(env: ManagerBasedRLEnv, eps: float) -> torch.Tensor:
-    """
-    Success bonus: if final object within eps of goal, only at terminal timestep.
-    """
-    final_pos = env.scene["object"].data.root_state_w[:, :3]
-    goal_pos  = env.scene["basket"].data.root_state_w[:, :3]
-
-    dist = torch.linalg.norm(final_pos - goal_pos, dim=-1)        # (N,)
-    succ = (dist < eps).to(dist.dtype)                            # (N,) → 0.0 or 1.0
-    done = env.termination_manager.dones.to(dist.dtype)           # (N,) → 0.0 or 1.0
-
-    # only pay out the bonus at the end
-    return succ * done
-
-def energy_penalty(env: ManagerBasedRLEnv, alpha: float) -> torch.Tensor:
-    v = env.scene["robot"].data.joint_vel  # (N, J)
-    return -alpha * torch.sum(v**2, dim=-1)

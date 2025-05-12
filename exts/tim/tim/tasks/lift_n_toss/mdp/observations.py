@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2024, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -29,7 +29,6 @@ def object_position_in_robot_root_frame(
         robot.data.root_state_w[:, :3], robot.data.root_state_w[:, 3:7], object_pos_w
     )
     return object_pos_b
-
 
 ## Tossing
 
@@ -69,4 +68,3 @@ def basket_root_pos_w(
     basket: RigidObject = env.scene[basket_cfg.name]
     # root_pos_w holds (x,y,z, quat), select first 3
     return basket.data.root_pos_w[:, :3]
-
