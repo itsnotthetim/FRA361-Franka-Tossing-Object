@@ -60,11 +60,3 @@ def gripper_status(
     return closed.unsqueeze(1)   
 
 
-def basket_root_pos_w(
-    env,
-    basket_cfg: SceneEntityCfg = SceneEntityCfg("basket"),
-) -> torch.Tensor:
-    """World-frame (x,y,z) of the basket centre, shape (N,3)."""
-    basket: RigidObject = env.scene[basket_cfg.name]
-    # root_pos_w holds (x,y,z, quat), select first 3
-    return basket.data.root_pos_w[:, :3]
