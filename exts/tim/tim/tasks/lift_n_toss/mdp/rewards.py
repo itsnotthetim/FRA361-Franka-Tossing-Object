@@ -44,6 +44,39 @@ def object_ee_distance(
 
     return 1 - torch.tanh(object_ee_distance / std)
 
+## which add not chasing reward
+# def object_ee_distance(
+#     env: ManagerBasedRLEnv,
+#     std: float,
+#     object_cfg: SceneEntityCfg    = SceneEntityCfg("object"),
+#     ee_frame_cfg: SceneEntityCfg  = SceneEntityCfg("ee_frame"),
+#     gripper_cfg: SceneEntityCfg   = SceneEntityCfg("robot"),
+#     finger_threshold: float       = 0.07,
+# ) -> torch.Tensor:
+#     """
+#     Reward the agent for reaching the object using a tanh‐kernel,
+#     but only while the gripper is still closed (i.e. pre‐launch).
+#     """
+#     # 1) Positions
+#     obj:   RigidObject     = env.scene[object_cfg.name]
+#     ee:    FrameTransformer = env.scene[ee_frame_cfg.name]
+#     cube_pos_w = obj.data.root_pos_w            # (N,3)
+#     ee_w       = ee.data.target_pos_w[..., 0, :] # (N,3)
+
+#     # 2) Distance → tanh‐kernel reward
+#     dist = torch.norm(cube_pos_w - ee_w, dim=1)          # (N,)
+#     reach_reward = 1.0 - torch.tanh(dist / std)          # (N,)
+
+#     # 3) Gripper‐closed mask
+#     robot   = env.scene[gripper_cfg.name]
+#     fingers = robot.data.joint_pos[:, -2:]               # (N,2)
+#     gap     = fingers.sum(dim=1)                         # (N,)
+#     closed  = (gap < finger_threshold).to(torch.float32) # (N,)
+
+#     # 4) Gate by gripper state
+#     return reach_reward * closed
+
+
 
 # def object_goal_distance(
 #     env: ManagerBasedRLEnv,
@@ -143,3 +176,6 @@ def throw_prep(
     throw_reward = -dist * gripper_closed * lifted  # Penalize distance if not holding object or not lifted
 
     return throw_reward
+
+
+

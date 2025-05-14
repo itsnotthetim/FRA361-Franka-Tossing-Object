@@ -136,17 +136,28 @@ class ObservationsCfg:
 class EventCfg:
     """Configuration for events."""
 
+    set_object_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("basket", body_names=["Cube_006"]),
+            "mass_distribution_params": (3.0, 3.0),  # fixed mass explicitly at 1.5 kg
+            "operation": "abs",  # correctly set absolute mass
+        },
+    )
+
     reset_all = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
 
     reset_object_position = EventTerm(
         func=mdp.reset_root_state_uniform,
         mode="reset",
         params={
-            "pose_range": {"x": (-0.1, 0.1), "y": (-0.25, 0.25), "z": (0.0, 0.0)},
+            "pose_range": {"x": (-0.0, -0.0), "y": (-0.25, 0.25), "z": (0.0, 0.0)},
             "velocity_range": {},
             "asset_cfg": SceneEntityCfg("object", body_names="Object"),
         },
     )
+
 
 
 @configclass
@@ -169,20 +180,20 @@ class RewardsCfg:
     
     # Phase I: lift accuracy (dense penalty) + success bonus (sparse)
         
-    reaching_object = RewTerm(func=mdp.object_ee_distance, params={"std": 0.1}, weight=1.0)
+    reaching_object = RewTerm(func=mdp.object_ee_distance, params={"std": 0.1}, weight=2.0)
 
-    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=10.0) # old is 15.0
+    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=12.5) # old is 15.0
 
     # Phase II: throw accuracy (dense penalty) + success bonus (sparse)
     accuracy = RewTerm(
         func=mdp.acc_term,
-        params={"k_acc": 20.0}, # old is 2.0
-        weight=1.0
+        params={"k_acc": 1.0}, # old is 2.0
+        weight=10.0 #old is 20.0
     )
     success = RewTerm(
         func=mdp.success_bonus,
-        params={"eps": 0.04},
-        weight=100.0
+        params={"eps": 0.05},
+        weight=1000.0
     )
 
     # # Smoothness regulariser (small penalty on joint velocities)
@@ -209,7 +220,7 @@ class RewardsCfg:
             "object_cfg": SceneEntityCfg("object"),
             "gripper_cfg": SceneEntityCfg("robot"),
         },
-        weight=2.0  # Adjust weight as needed
+        weight=4.0  # Adjust weight as needed
     )
 
 

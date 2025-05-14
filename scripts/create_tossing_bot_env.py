@@ -64,7 +64,7 @@ def main():
     print(current_dir)
     env_cfg = FrankaCubeLiftEnvCfg()
     
-    env_cfg.scene.num_envs = 10
+    env_cfg.scene.num_envs = 1
     env_cfg.scene.env_spacing = 6.0
     env = ManagerBasedRLEnv(cfg=env_cfg)
     env.reset()
@@ -90,9 +90,26 @@ def main():
                 save_pos = 0
                 dur = 0
 
-            joint_efforts = torch.randn_like(env.action_manager.action)
+            # joint_efforts = torch.randn_like(env.action_manager.action)
+            joint_efforts = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]])
             # step the environment
             obs, rew, terminated, truncated, info = env.step(joint_efforts)
+
+            ee_current_pos = robot_entity.data.body_state_w[0, ee_idx, :3].cpu().numpy()
+
+            cube_position = cube_entity.data.root_pos_w[0].cpu().numpy()
+                    # print("Randomized object position:", cube_position)
+            cube_pos = cube_position.tolist()
+
+            basket_position = basket_entity.data.root_pos_w[0].cpu().numpy()
+                    # print("Randomized object position:", cube_position)
+            basket_pos = basket_position.tolist()
+
+            print(
+                f"ee_pos:   {ee_current_pos}\n"
+                f"cube_pos: {cube_pos}\n"
+                f"basket_pos: {basket_pos}"
+            )
             
         
 
