@@ -17,41 +17,41 @@ if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedRLEnv
 
 
-# def object_is_lifted(
-#     env: ManagerBasedRLEnv, minimal_height: float, object_cfg: SceneEntityCfg = SceneEntityCfg("object")
-# ) -> torch.Tensor:
-#     """Reward the agent for lifting the object above the minimal height."""
-#     object: RigidObject = env.scene[object_cfg.name]
-#     return torch.where(object.data.root_pos_w[:, 2] > minimal_height, 1.0, 0.0)
-
-def object_lift_shaping(
-    env: ManagerBasedRLEnv,
-    minimal_height: float      = 0.04,   # lift threshold (m)
-    target_height : float      = 0.10,   # height at which reward saturates (m)
-    object_cfg    : SceneEntityCfg = SceneEntityCfg("object"),
-    gripper_cfg   : SceneEntityCfg = SceneEntityCfg("robot"),
-    grasp_threshold: float     = 0.07,   # gripper-gap that counts as “closed”
+def object_is_lifted(
+    env: ManagerBasedRLEnv, minimal_height: float, object_cfg: SceneEntityCfg = SceneEntityCfg("object")
 ) -> torch.Tensor:
-    """
-    Shaped lift reward:
-        r = 0                         , z <= h_min
-        r = (z - h_min)/(h_tgt-h_min) , h_min < z < h_tgt
-        r = 1                         , z >= h_tgt
-    Reward is further masked to zero if the gripper is open.
-    """
-    # cube height
-    z = env.scene[object_cfg.name].data.root_pos_w[:, 2]     # (N,)
+    """Reward the agent for lifting the object above the minimal height."""
+    object: RigidObject = env.scene[object_cfg.name]
+    return torch.where(object.data.root_pos_w[:, 2] > minimal_height, 1.0, 0.0)
 
-    # linear ramp between h_min and h_tgt, then clamp to [0,1]
-    ramp = torch.clamp((z - minimal_height) /
-                       (target_height - minimal_height), 0.0, 1.0)
+# def object_lift_shaping(
+#     env: ManagerBasedRLEnv,
+#     minimal_height: float      = 0.04,   # lift threshold (m)
+#     target_height : float      = 0.10,   # height at which reward saturates (m)
+#     object_cfg    : SceneEntityCfg = SceneEntityCfg("object"),
+#     gripper_cfg   : SceneEntityCfg = SceneEntityCfg("robot"),
+#     grasp_threshold: float     = 0.07,   # gripper-gap that counts as “closed”
+# ) -> torch.Tensor:
+#     """
+#     Shaped lift reward:
+#         r = 0                         , z <= h_min
+#         r = (z - h_min)/(h_tgt-h_min) , h_min < z < h_tgt
+#         r = 1                         , z >= h_tgt
+#     Reward is further masked to zero if the gripper is open.
+#     """
+#     # cube height
+#     z = env.scene[object_cfg.name].data.root_pos_w[:, 2]     # (N,)
 
-    # gripper-closed mask (optional but recommended)
-    fingers = env.scene[gripper_cfg.name].data.joint_pos[:, -2:]  # (N,2)
-    gap = fingers.sum(dim=1)
-    closed = (gap < grasp_threshold).to(torch.float32)            # (N,)
+#     # linear ramp between h_min and h_tgt, then clamp to [0,1]
+#     ramp = torch.clamp((z - minimal_height) /
+#                        (target_height - minimal_height), 0.0, 1.0)
 
-    return ramp * closed
+#     # gripper-closed mask (optional but recommended)
+#     fingers = env.scene[gripper_cfg.name].data.joint_pos[:, -2:]  # (N,2)
+#     gap = fingers.sum(dim=1)
+#     closed = (gap < grasp_threshold).to(torch.float32)            # (N,)
+
+#     return ramp * closed
 
 
 
@@ -284,72 +284,122 @@ def throw_prep(
     return throw_reward
 
 
-def release_bonus(
-    env: ManagerBasedRLEnv,
-    basket_cfg: SceneEntityCfg = SceneEntityCfg("basket"),
-    gripper_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-    minimal_height: float = 0.04,
-    grasp_threshold: float = 0.07,
-    release_radius: float = 0.05,
-) -> torch.Tensor:
-    """
-    Reward the agent for releasing the object near the basket:
-      – Only at the terminal step (done)
-      – Only if the gripper is open (gap > grasp_threshold)
-      – Only if the object was airborne (height > minimal_height)
-      – Only if the final object position is within release_radius of the basket
-    Returns a (N,) tensor of 1.0 where all conditions are met, else 0.0.
-    """
-    # 1) Episode done
-    done = env.termination_manager.dones  # (N,)
-
-    # 2) Gripper-open mask (direct syntax)
-    robot   = env.scene[gripper_cfg.name]
-    fingers = robot.data.joint_pos[:, -2:]         # (N,2)
-    gap     = fingers.sum(dim=1)                   # (N,)
-    open_grip = gap > grasp_threshold              # (N,)
-
-    # 3) Object airborne mask
-    obj = env.scene["object"]
-    pos = obj.data.root_pos_w[:, :3]               # (N,3)
-    height = pos[:, 2]                             # (N,)
-    airborne = height > minimal_height             # (N,)
-
-    # 4) Near-basket mask
-    basket = env.scene[basket_cfg.name]
-    goal_pos = basket.data.root_pos_w[:, :3]       # (N,3)
-    dist = torch.norm(pos - goal_pos, dim=1)       # (N,)
-    near_basket = dist < release_radius            # (N,)
-
-    # 5) Combine all conditions
-    mask = done & open_grip & airborne & near_basket
-
-    return mask.to(torch.float32)  
-
-
-# def hold_penalty(
+# def release_bonus(
 #     env: ManagerBasedRLEnv,
-#     beta: float = 0.01,                         # per-step cost
+#     basket_cfg: SceneEntityCfg = SceneEntityCfg("basket"),
 #     gripper_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-#     object_cfg : SceneEntityCfg = SceneEntityCfg("object"),
 #     minimal_height: float = 0.04,
 #     grasp_threshold: float = 0.07,
+#     release_radius: float = 0.05,
 # ) -> torch.Tensor:
 #     """
-#     Per-step negative reward if the robot is still holding the object
-#     (gripper closed) *and* the object has already been lifted.
-#     r = −beta   whenever  (gap < grasp_threshold)  &  (z > minimal_height)
+#     Reward the agent for releasing the object near the basket:
+#       – Only at the terminal step (done)
+#       – Only if the gripper is open (gap > grasp_threshold)
+#       – Only if the object was airborne (height > minimal_height)
+#       – Only if the final object position is within release_radius of the basket
+#     Returns a (N,) tensor of 1.0 where all conditions are met, else 0.0.
 #     """
-#     # gripper closed?
-#     fingers = env.scene[gripper_cfg.name].data.joint_pos[:, -2:]   # (N,2)
-#     gap     = fingers.sum(dim=1)                                   # (N,)
-#     closed  = gap < grasp_threshold                                # bool (N,)
+#     # 1) Episode done
+#     done = env.termination_manager.dones  # (N,)
 
-#     # object lifted?
-#     z = env.scene[object_cfg.name].data.root_pos_w[:, 2]           # (N,)
-#     lifted = z > minimal_height                                    # bool (N,)
+#     # 2) Gripper-open mask (direct syntax)
+#     robot   = env.scene[gripper_cfg.name]
+#     fingers = robot.data.joint_pos[:, -2:]         # (N,2)
+#     gap     = fingers.sum(dim=1)                   # (N,)
+#     open_grip = gap > grasp_threshold              # (N,)
 
-#     # penalty mask
-#     mask = closed & lifted                                         # bool (N,)
+#     # 3) Object airborne mask
+#     obj = env.scene["object"]
+#     pos = obj.data.root_pos_w[:, :3]               # (N,3)
+#     height = pos[:, 2]                             # (N,)
+#     airborne = height > minimal_height             # (N,)
 
-#     return (-beta) * mask.to(torch.float32)                        # (N,)
+#     # 4) Near-basket mask
+#     basket = env.scene[basket_cfg.name]
+#     goal_pos = basket.data.root_pos_w[:, :3]       # (N,3)
+#     dist = torch.norm(pos - goal_pos, dim=1)       # (N,)
+#     near_basket = dist < release_radius            # (N,)
+
+#     # 5) Combine all conditions
+#     mask = done & open_grip & airborne & near_basket
+
+#     return mask.to(torch.float32)  
+
+
+def hold_penalty(
+    env: ManagerBasedRLEnv,
+    beta: float = 0.01,                         # per-step cost
+    gripper_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    object_cfg : SceneEntityCfg = SceneEntityCfg("object"),
+    minimal_height: float = 0.04,
+    grasp_threshold: float = 0.07,
+) -> torch.Tensor:
+    """
+    Per-step negative reward if the robot is still holding the object
+    (gripper closed) *and* the object has already been lifted.
+    r = −beta   whenever  (gap < grasp_threshold)  &  (z > minimal_height)
+    """
+    # gripper closed?
+    fingers = env.scene[gripper_cfg.name].data.joint_pos[:, -2:]   # (N,2)
+    gap     = fingers.sum(dim=1)                                   # (N,)
+    closed  = gap < grasp_threshold                                # bool (N,)
+
+    # object lifted?
+    z = env.scene[object_cfg.name].data.root_pos_w[:, 2]           # (N,)
+    lifted = z > minimal_height                                    # bool (N,)
+
+    # penalty mask
+    mask = closed & lifted                                         # bool (N,)
+
+    return (-beta) * mask.to(torch.float32)                        # (N,)
+
+
+# Allocate a module-level buffer on first call and keep updating it.
+_prev_closed = None   # will become a torch.BoolTensor (N,)
+
+def release_success(
+    env: ManagerBasedRLEnv,
+    launch_height : float       = 0.08,
+    grasp_threshold: float      = 0.07,
+    basket_cfg    : SceneEntityCfg = SceneEntityCfg("basket"),
+    object_cfg    : SceneEntityCfg = SceneEntityCfg("object"),
+    gripper_cfg   : SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """
+    Reward = 1 when the gripper *opens this step* (closed→open) AND
+    the cube is already above `launch_height`. Fires once per release.
+    """
+    global _prev_closed
+
+    N      = env.num_envs
+    device = env.scene[gripper_cfg.name].data.device
+
+    # ------------------------------------------------------------------
+    # 1) Current gripper state (closed = True/False)
+    fingers = env.scene[gripper_cfg.name].data.joint_pos[:, -2:]        # (N,2)
+    gap     = fingers.sum(dim=1)                                        # (N,)
+    closed_now = gap < grasp_threshold                                  # bool (N,)
+
+    # Initialise buffer on first call
+    if _prev_closed is None or _prev_closed.numel() != N:
+        _prev_closed = torch.ones(N, dtype=torch.bool, device=device)
+
+    # ------------------------------------------------------------------
+    # 2) Transition: was closed last step, open this step
+    just_opened = _prev_closed & (~closed_now)                          # bool (N,)
+
+    # ------------------------------------------------------------------
+    # 3) Height check
+    z = env.scene[object_cfg.name].data.root_pos_w[:, 2]                # (N,)
+    airborne = z > launch_height                                        # bool (N,)
+
+    # ------------------------------------------------------------------
+    # 4) Reward mask
+    mask = just_opened & airborne                                       # bool (N,)
+
+    # ------------------------------------------------------------------
+    # 5) Update buffer for next step
+    _prev_closed[:] = closed_now
+
+    return mask.to(torch.float32)   
