@@ -17,12 +17,46 @@ if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedRLEnv
 
 
-def object_is_lifted(
-    env: ManagerBasedRLEnv, minimal_height: float, object_cfg: SceneEntityCfg = SceneEntityCfg("object")
+# def object_is_lifted(
+#     env: ManagerBasedRLEnv, minimal_height: float, object_cfg: SceneEntityCfg = SceneEntityCfg("object")
+# ) -> torch.Tensor:
+#     """Reward the agent for lifting the object above the minimal height."""
+#     object: RigidObject = env.scene[object_cfg.name]
+#     return torch.where(object.data.root_pos_w[:, 2] > minimal_height, 1.0, 0.0)
+
+import torch
+from omni.isaac.lab.envs.mdp import ManagerBasedRLEnv
+from omni.isaac.lab.managers import SceneEntityCfg
+
+def object_lift_shaping(
+    env: ManagerBasedRLEnv,
+    minimal_height: float      = 0.04,   # lift threshold (m)
+    target_height : float      = 0.10,   # height at which reward saturates (m)
+    object_cfg    : SceneEntityCfg = SceneEntityCfg("object"),
+    gripper_cfg   : SceneEntityCfg = SceneEntityCfg("robot"),
+    grasp_threshold: float     = 0.07,   # gripper-gap that counts as “closed”
 ) -> torch.Tensor:
-    """Reward the agent for lifting the object above the minimal height."""
-    object: RigidObject = env.scene[object_cfg.name]
-    return torch.where(object.data.root_pos_w[:, 2] > minimal_height, 1.0, 0.0)
+    """
+    Shaped lift reward:
+        r = 0                         , z <= h_min
+        r = (z - h_min)/(h_tgt-h_min) , h_min < z < h_tgt
+        r = 1                         , z >= h_tgt
+    Reward is further masked to zero if the gripper is open.
+    """
+    # cube height
+    z = env.scene[object_cfg.name].data.root_pos_w[:, 2]     # (N,)
+
+    # linear ramp between h_min and h_tgt, then clamp to [0,1]
+    ramp = torch.clamp((z - minimal_height) /
+                       (target_height - minimal_height), 0.0, 1.0)
+
+    # gripper-closed mask (optional but recommended)
+    fingers = env.scene[gripper_cfg.name].data.joint_pos[:, -2:]  # (N,2)
+    gap = fingers.sum(dim=1)
+    closed = (gap < grasp_threshold).to(torch.float32)            # (N,)
+
+    return ramp * closed
+
 
 
 def object_ee_distance(
@@ -297,29 +331,29 @@ def release_bonus(
     return mask.to(torch.float32)  
 
 
-def hold_penalty(
-    env: ManagerBasedRLEnv,
-    beta: float = 0.01,                         # per-step cost
-    gripper_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-    object_cfg : SceneEntityCfg = SceneEntityCfg("object"),
-    minimal_height: float = 0.04,
-    grasp_threshold: float = 0.07,
-) -> torch.Tensor:
-    """
-    Per-step negative reward if the robot is still holding the object
-    (gripper closed) *and* the object has already been lifted.
-    r = −beta   whenever  (gap < grasp_threshold)  &  (z > minimal_height)
-    """
-    # gripper closed?
-    fingers = env.scene[gripper_cfg.name].data.joint_pos[:, -2:]   # (N,2)
-    gap     = fingers.sum(dim=1)                                   # (N,)
-    closed  = gap < grasp_threshold                                # bool (N,)
+# def hold_penalty(
+#     env: ManagerBasedRLEnv,
+#     beta: float = 0.01,                         # per-step cost
+#     gripper_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+#     object_cfg : SceneEntityCfg = SceneEntityCfg("object"),
+#     minimal_height: float = 0.04,
+#     grasp_threshold: float = 0.07,
+# ) -> torch.Tensor:
+#     """
+#     Per-step negative reward if the robot is still holding the object
+#     (gripper closed) *and* the object has already been lifted.
+#     r = −beta   whenever  (gap < grasp_threshold)  &  (z > minimal_height)
+#     """
+#     # gripper closed?
+#     fingers = env.scene[gripper_cfg.name].data.joint_pos[:, -2:]   # (N,2)
+#     gap     = fingers.sum(dim=1)                                   # (N,)
+#     closed  = gap < grasp_threshold                                # bool (N,)
 
-    # object lifted?
-    z = env.scene[object_cfg.name].data.root_pos_w[:, 2]           # (N,)
-    lifted = z > minimal_height                                    # bool (N,)
+#     # object lifted?
+#     z = env.scene[object_cfg.name].data.root_pos_w[:, 2]           # (N,)
+#     lifted = z > minimal_height                                    # bool (N,)
 
-    # penalty mask
-    mask = closed & lifted                                         # bool (N,)
+#     # penalty mask
+#     mask = closed & lifted                                         # bool (N,)
 
-    return (-beta) * mask.to(torch.float32)                        # (N,)
+#     return (-beta) * mask.to(torch.float32)                        # (N,)

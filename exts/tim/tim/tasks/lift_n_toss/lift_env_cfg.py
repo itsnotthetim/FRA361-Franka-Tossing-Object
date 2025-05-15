@@ -192,7 +192,18 @@ class RewardsCfg:
         
     reaching_object = RewTerm(func=mdp.object_ee_distance, params={"std": 0.1}, weight=1.0)
 
-    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=15.0) # old is 15.0
+    # lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=15.0) # old is 15.0
+    
+    lift_shaping = RewTerm(
+    func=mdp.object_lift_shaping,
+    params={
+        "minimal_height": 0.04,
+        "target_height":  0.10,
+        "object_cfg":  SceneEntityCfg("object"),
+        "gripper_cfg": SceneEntityCfg("robot"),
+    },
+    weight=15.0    # tune relative to other rewards
+)
 
     # Phase II: throw accuracy (dense penalty) + success bonus (sparse)
     accuracy = RewTerm(
@@ -233,17 +244,17 @@ class RewardsCfg:
         weight=2.5  # Adjust weight as needed
     )
 
-#     hold_penalty = RewTerm(
-#     func=mdp.hold_penalty,
-#     params={
-#         "beta": 0.01,               # tune: 0.005–0.02 typical
-#         "minimal_height": 0.04,
-#         "gripper_cfg": SceneEntityCfg("robot"),
-#         "object_cfg" : SceneEntityCfg("object"),
-#         "grasp_threshold": 0.07,
-#     },
-#     weight=1.0          # keep weight = 1.0 because beta already sets magnitude
-# )
+    # hold_penalty = RewTerm(
+    # func=mdp.hold_penalty,
+    # params={
+    #     "beta": 0.01,               # tune: 0.005–0.02 typical
+    #     "minimal_height": 0.04,
+    #     "gripper_cfg": SceneEntityCfg("robot"),
+    #     "object_cfg" : SceneEntityCfg("object"),
+    #     "grasp_threshold": 0.07,
+    # },
+    # weight=5.0          # keep weight = 1.0 because beta already sets magnitude
+)
 
 @configclass
 class TerminationsCfg:
