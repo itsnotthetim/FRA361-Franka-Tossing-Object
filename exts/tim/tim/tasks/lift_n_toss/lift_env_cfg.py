@@ -192,7 +192,7 @@ class RewardsCfg:
         
     reaching_object = RewTerm(func=mdp.object_ee_distance, params={"std": 0.1}, weight=1.0)
 
-    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=8.0) # old is 15.0
+    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=15.0) # old is 15.0
 #     lift_shaping = RewTerm(
 #     func=mdp.object_lift_shaping,
 #     params={
@@ -240,7 +240,7 @@ class RewardsCfg:
             "object_cfg": SceneEntityCfg("object"),
             "gripper_cfg": SceneEntityCfg("robot"),
         },
-        weight=1.0  # Adjust weight as needed
+        weight=2.0  # Adjust weight as needed
     )
 
     hold_penalty = RewTerm(
