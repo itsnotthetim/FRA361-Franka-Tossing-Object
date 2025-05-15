@@ -24,10 +24,6 @@ if TYPE_CHECKING:
 #     object: RigidObject = env.scene[object_cfg.name]
 #     return torch.where(object.data.root_pos_w[:, 2] > minimal_height, 1.0, 0.0)
 
-import torch
-from omni.isaac.lab.envs.mdp import ManagerBasedRLEnv
-from omni.isaac.lab.managers import SceneEntityCfg
-
 def object_lift_shaping(
     env: ManagerBasedRLEnv,
     minimal_height: float      = 0.04,   # lift threshold (m)

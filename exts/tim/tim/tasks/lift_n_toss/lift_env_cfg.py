@@ -203,7 +203,7 @@ class RewardsCfg:
         "gripper_cfg": SceneEntityCfg("robot"),
     },
     weight=15.0    # tune relative to other rewards
-)
+    )
 
     # Phase II: throw accuracy (dense penalty) + success bonus (sparse)
     accuracy = RewTerm(
@@ -254,7 +254,7 @@ class RewardsCfg:
     #     "grasp_threshold": 0.07,
     # },
     # weight=5.0          # keep weight = 1.0 because beta already sets magnitude
-)
+# )
 
 @configclass
 class TerminationsCfg:
