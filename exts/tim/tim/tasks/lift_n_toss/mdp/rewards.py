@@ -296,3 +296,30 @@ def release_bonus(
 
     return mask.to(torch.float32)  
 
+
+def hold_penalty(
+    env: ManagerBasedRLEnv,
+    beta: float = 0.01,                         # per-step cost
+    gripper_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    object_cfg : SceneEntityCfg = SceneEntityCfg("object"),
+    minimal_height: float = 0.04,
+    grasp_threshold: float = 0.07,
+) -> torch.Tensor:
+    """
+    Per-step negative reward if the robot is still holding the object
+    (gripper closed) *and* the object has already been lifted.
+    r = −beta   whenever  (gap < grasp_threshold)  &  (z > minimal_height)
+    """
+    # gripper closed?
+    fingers = env.scene[gripper_cfg.name].data.joint_pos[:, -2:]   # (N,2)
+    gap     = fingers.sum(dim=1)                                   # (N,)
+    closed  = gap < grasp_threshold                                # bool (N,)
+
+    # object lifted?
+    z = env.scene[object_cfg.name].data.root_pos_w[:, 2]           # (N,)
+    lifted = z > minimal_height                                    # bool (N,)
+
+    # penalty mask
+    mask = closed & lifted                                         # bool (N,)
+
+    return (-beta) * mask.to(torch.float32)                        # (N,)

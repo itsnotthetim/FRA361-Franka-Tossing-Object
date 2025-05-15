@@ -162,7 +162,7 @@ class EventCfg:
         func=mdp.reset_root_state_uniform,
         mode="reset",
         params={
-            "pose_range": {"x": (-0.0, -0.0), "y": (-0.25, 0.25), "z": (0.0, 0.0)},
+            "pose_range": {"x": (-0.0, -0.0), "y": (-0.25, 0.0), "z": (0.0, 0.0)},
             "velocity_range": {},
             "asset_cfg": SceneEntityCfg("object", body_names="Object"),
         },
@@ -233,18 +233,17 @@ class RewardsCfg:
         weight=2.5  # Adjust weight as needed
     )
 
-     # new release bonus term
-    # release_bonus = RewTerm(
-    #     func=mdp.release_bonus,
-    #     params={
-    #         "basket_cfg": SceneEntityCfg("basket"),
-    #         "gripper_cfg": SceneEntityCfg("robot"),
-    #         "minimal_height": 0.04,
-    #         "grasp_threshold": 0.07,
-    #         "release_radius": 0.5,
-    #     },
-    #     weight=10.0,   # tune this up or down to control its impact
-    # )
+#     hold_penalty = RewTerm(
+#     func=mdp.hold_penalty,
+#     params={
+#         "beta": 0.01,               # tune: 0.005–0.02 typical
+#         "minimal_height": 0.04,
+#         "gripper_cfg": SceneEntityCfg("robot"),
+#         "object_cfg" : SceneEntityCfg("object"),
+#         "grasp_threshold": 0.07,
+#     },
+#     weight=1.0          # keep weight = 1.0 because beta already sets magnitude
+# )
 
 @configclass
 class TerminationsCfg:
