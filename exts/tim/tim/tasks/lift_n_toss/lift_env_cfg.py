@@ -192,17 +192,7 @@ class RewardsCfg:
         
     reaching_object = RewTerm(func=mdp.object_ee_distance, params={"std": 0.1}, weight=1.0)
 
-    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=15.0) # old is 15.0
-#     lift_shaping = RewTerm(
-#     func=mdp.object_lift_shaping,
-#     params={
-#         "minimal_height": 0.04,
-#         "target_height":  0.10,
-#         "object_cfg":  SceneEntityCfg("object"),
-#         "gripper_cfg": SceneEntityCfg("robot"),
-#     },
-#     weight=5.0    # tune relative to other rewards
-# )
+    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=8.0) # old is 15.0
 
     # Phase II: throw accuracy (dense penalty) + success bonus (sparse)
     accuracy = RewTerm(
@@ -212,7 +202,7 @@ class RewardsCfg:
     )
     success = RewTerm(
         func=mdp.success_bonus,
-        params={"eps": 0.1},
+        params={"eps": 0.05},
         weight=2000.0
     )
 
@@ -273,6 +263,16 @@ class TerminationsCfg:
 
     object_dropping = DoneTerm(
         func=mdp.root_height_below_minimum, params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("object")}
+    )
+
+    object_in_basket = DoneTerm(
+        func=mdp.object_in_basket,
+        params={
+            "eps_xy": 0.05,            # 5 cm radius
+            "rim_clearance": 0.03,     # 2 cm below rim guarantees “landed”
+            "object_cfg": SceneEntityCfg("object"),
+            "basket_cfg": SceneEntityCfg("basket"),
+        },
     )
 
 

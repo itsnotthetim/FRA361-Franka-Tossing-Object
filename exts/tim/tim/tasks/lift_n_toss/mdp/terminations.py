@@ -51,3 +51,31 @@ def object_reached_goal(
 
     # rewarded if the object is lifted above the threshold
     return distance < threshold
+
+def object_in_basket(
+    env: ManagerBasedRLEnv,
+    eps_xy: float                = 0.05,   # XY tolerance (m)
+    rim_clearance: float         = 0.02,   # object must fall below rim − clearance
+    object_cfg: SceneEntityCfg   = SceneEntityCfg("object"),
+    basket_cfg: SceneEntityCfg   = SceneEntityCfg("basket"),
+) -> torch.Tensor:
+    """
+    Termination condition: return True for each env where the cube has
+    • fallen to (or below) basket-rim height minus `rim_clearance`, AND
+    • is horizontally within `eps_xy` of the basket centre.
+
+    Returns: Bool tensor of shape (N,) suitable for DoneTerm.
+    """
+    # world-frame positions
+    p_obj = env.scene[object_cfg.name].data.root_pos_w[:, :3]   # (N,3)
+    p_goal = env.scene[basket_cfg.name].data.root_pos_w[:, :3]  # (N,3)
+
+    # 1) XY proximity
+    horiz_dist = torch.linalg.norm(p_obj[:, :2] - p_goal[:, :2], dim=1)   # (N,)
+    inside_xy  = horiz_dist < eps_xy                                      # bool (N,)
+
+    # 2) Z below rim
+    rim_height = p_goal[:, 2]                                             # assume USD origin at rim
+    below_rim  = p_obj[:, 2] < (rim_height - rim_clearance)               # bool (N,)
+
+    return inside_xy & below_rim            

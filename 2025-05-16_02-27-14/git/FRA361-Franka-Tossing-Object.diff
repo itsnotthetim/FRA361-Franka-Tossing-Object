@@ -1,0 +1,397 @@
+--- git status ---
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py
+	modified:   exts/tim/tim/tasks/lift_n_toss/mdp/terminations.py
+	deleted:    scripts/rsl_rl/toss_train.py
+	deleted:    scripts/rsl_rl/train_isaac.py
+
+no changes added to commit (use "git add" and/or "git commit -a") 
+
+
+--- git diff ---
+diff --git a/exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py b/exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py
+index 5ca5374..9548c8a 100644
+--- a/exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py
++++ b/exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py
+@@ -192,7 +192,7 @@ class RewardsCfg:
+         
+     reaching_object = RewTerm(func=mdp.object_ee_distance, params={"std": 0.1}, weight=1.0)
+ 
+-    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=15.0) # old is 15.0
++    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=8.0) # old is 15.0
+ #     lift_shaping = RewTerm(
+ #     func=mdp.object_lift_shaping,
+ #     params={
+@@ -212,7 +212,7 @@ class RewardsCfg:
+     )
+     success = RewTerm(
+         func=mdp.success_bonus,
+-        params={"eps": 0.1},
++        params={"eps": 0.05},
+         weight=2000.0
+     )
+ 
+@@ -275,6 +275,16 @@ class TerminationsCfg:
+         func=mdp.root_height_below_minimum, params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("object")}
+     )
+ 
++    object_in_basket = DoneTerm(
++        func=mdp.object_in_basket,
++        params={
++            "eps_xy": 0.05,            # 5 cm radius
++            "rim_clearance": 0.03,     # 2 cm below rim guarantees “landed”
++            "object_cfg": SceneEntityCfg("object"),
++            "basket_cfg": SceneEntityCfg("basket"),
++        },
++    )
++
+ 
+ @configclass
+ class CurriculumCfg:
+diff --git a/exts/tim/tim/tasks/lift_n_toss/mdp/terminations.py b/exts/tim/tim/tasks/lift_n_toss/mdp/terminations.py
+index 212e192..ece36bf 100644
+--- a/exts/tim/tim/tasks/lift_n_toss/mdp/terminations.py
++++ b/exts/tim/tim/tasks/lift_n_toss/mdp/terminations.py
+@@ -51,3 +51,31 @@ def object_reached_goal(
+ 
+     # rewarded if the object is lifted above the threshold
+     return distance < threshold
++
++def object_in_basket(
++    env: ManagerBasedRLEnv,
++    eps_xy: float                = 0.05,   # XY tolerance (m)
++    rim_clearance: float         = 0.02,   # object must fall below rim − clearance
++    object_cfg: SceneEntityCfg   = SceneEntityCfg("object"),
++    basket_cfg: SceneEntityCfg   = SceneEntityCfg("basket"),
++) -> torch.Tensor:
++    """
++    Termination condition: return True for each env where the cube has
++    • fallen to (or below) basket-rim height minus `rim_clearance`, AND
++    • is horizontally within `eps_xy` of the basket centre.
++
++    Returns: Bool tensor of shape (N,) suitable for DoneTerm.
++    """
++    # world-frame positions
++    p_obj = env.scene[object_cfg.name].data.root_pos_w[:, :3]   # (N,3)
++    p_goal = env.scene[basket_cfg.name].data.root_pos_w[:, :3]  # (N,3)
++
++    # 1) XY proximity
++    horiz_dist = torch.linalg.norm(p_obj[:, :2] - p_goal[:, :2], dim=1)   # (N,)
++    inside_xy  = horiz_dist < eps_xy                                      # bool (N,)
++
++    # 2) Z below rim
++    rim_height = p_goal[:, 2]                                             # assume USD origin at rim
++    below_rim  = p_obj[:, 2] < (rim_height - rim_clearance)               # bool (N,)
++
++    return inside_xy & below_rim            
+diff --git a/scripts/rsl_rl/toss_train.py b/scripts/rsl_rl/toss_train.py
+deleted file mode 100644
+index 20a4b9a..0000000
+--- a/scripts/rsl_rl/toss_train.py
++++ /dev/null
+@@ -1,134 +0,0 @@
+-"""Script to train RL agent with RSL-RL."""
+-
+-"""Launch Isaac Sim Simulator first."""
+-
+-import argparse
+-
+-from omni.isaac.lab.app import AppLauncher
+-
+-# local imports
+-import cli_args  # isort: skip
+-
+-# add argparse arguments
+-parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
+-parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
+-parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
+-parser.add_argument("--video_interval", type=int, default=2000, help="Interval between video recordings (in steps).")
+-parser.add_argument(
+-    "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
+-)
+-parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
+-parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+-parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
+-parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
+-# append RSL-RL cli arguments
+-cli_args.add_rsl_rl_args(parser)
+-# append AppLauncher cli args
+-AppLauncher.add_app_launcher_args(parser)
+-args_cli = parser.parse_args()
+-# always enable cameras to record video
+-if args_cli.video:
+-    args_cli.enable_cameras = True
+-
+-# launch omniverse app
+-app_launcher = AppLauncher(args_cli)
+-simulation_app = app_launcher.app
+-
+-"""Rest everything follows."""
+-
+-import gymnasium as gym
+-import os
+-import torch
+-from datetime import datetime
+-
+-from rsl_rl.runners import OnPolicyRunner
+-
+-
+-import sys, os
+-sys.path.append(os.getcwd())
+-# Import extensions to set up environment tasks
+-import tim.tasks # noqa: F401
+-
+-from omni.isaac.lab.envs import ManagerBasedRLEnvCfg
+-from omni.isaac.lab.utils.dict import print_dict
+-from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
+-from omni.isaac.lab_tasks.utils import get_checkpoint_path, parse_env_cfg
+-from omni.isaac.lab_tasks.utils.wrappers.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper
+-
+-torch.backends.cuda.matmul.allow_tf32 = True
+-torch.backends.cudnn.allow_tf32 = True
+-torch.backends.cudnn.deterministic = False
+-torch.backends.cudnn.benchmark = False
+-
+-
+-def main():
+-    """Train with RSL-RL agent."""
+-    # parse configuration
+-    env_cfg: ManagerBasedRLEnvCfg = parse_env_cfg(
+-        args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric
+-    )
+-    agent_cfg: RslRlOnPolicyRunnerCfg = cli_args.parse_rsl_rl_cfg(args_cli.task, args_cli)
+-
+-    # specify directory for logging experiments
+-    log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
+-    log_root_path = os.path.abspath(log_root_path)
+-    print(f"[INFO] Logging experiment in directory: {log_root_path}")
+-    # specify directory for logging runs: {time-stamp}_{run_name}
+-    log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+-    if agent_cfg.run_name:
+-        log_dir += f"_{agent_cfg.run_name}"
+-    log_dir = os.path.join(log_root_path, log_dir)
+-
+-    # max iterations for training
+-    if args_cli.max_iterations:
+-        agent_cfg.max_iterations = args_cli.max_iterations
+-
+-    # create isaac environment
+-    env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+-    # wrap for video recording
+-    if args_cli.video:
+-        video_kwargs = {
+-            "video_folder": os.path.join(log_dir, "videos", "train"),
+-            "step_trigger": lambda step: step % args_cli.video_interval == 0,
+-            "video_length": args_cli.video_length,
+-            "disable_logger": True,
+-        }
+-        print("[INFO] Recording videos during training.")
+-        print_dict(video_kwargs, nesting=4)
+-        env = gym.wrappers.RecordVideo(env, **video_kwargs)
+-    # wrap around environment for rsl-rl
+-    env = RslRlVecEnvWrapper(env)
+-
+-    # create runner from rsl-rl
+-    runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
+-    # write git state to logs
+-    runner.add_git_repo_to_log(__file__)
+-    # save resume path before creating a new log_dir
+-    if agent_cfg.resume:
+-        # get path to previous checkpoint
+-        resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
+-        print(f"[INFO]: Loading model checkpoint from: {resume_path}")
+-        # load previously trained model
+-        runner.load(resume_path)
+-
+-    # set seed of the environment
+-    env.seed(agent_cfg.seed)
+-
+-    # dump the configuration into log-directory
+-    dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
+-    dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
+-    dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
+-    dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
+-
+-    # run training
+-    runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
+-
+-    # close the simulator
+-    env.close()
+-
+-
+-if __name__ == "__main__":
+-    # run the main execution
+-    main()
+-    # close sim app
+-    simulation_app.close()
+diff --git a/scripts/rsl_rl/train_isaac.py b/scripts/rsl_rl/train_isaac.py
+deleted file mode 100644
+index 5b2c81d..0000000
+--- a/scripts/rsl_rl/train_isaac.py
++++ /dev/null
+@@ -1,159 +0,0 @@
+-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
+-# All rights reserved.
+-#
+-# SPDX-License-Identifier: BSD-3-Clause
+-
+-"""Script to train RL agent with RSL-RL."""
+-
+-"""Launch Isaac Sim Simulator first."""
+-
+-import argparse
+-import sys
+-
+-from omni.isaac.lab.app import AppLauncher
+-
+-# local imports
+-import cli_args_isaac  # isort: skip
+-
+-
+-# add argparse arguments
+-parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
+-parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
+-parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
+-parser.add_argument("--video_interval", type=int, default=2000, help="Interval between video recordings (in steps).")
+-parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
+-parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+-parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
+-parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
+-# append RSL-RL cli arguments
+-cli_args_isaac.add_rsl_rl_args(parser)
+-# append AppLauncher cli args
+-AppLauncher.add_app_launcher_args(parser)
+-args_cli, hydra_args = parser.parse_known_args()
+-
+-# always enable cameras to record video
+-if args_cli.video:
+-    args_cli.enable_cameras = True
+-
+-# clear out sys.argv for Hydra
+-sys.argv = [sys.argv[0]] + hydra_args
+-
+-# launch omniverse app
+-app_launcher = AppLauncher(args_cli)
+-simulation_app = app_launcher.app
+-
+-"""Rest everything follows."""
+-
+-import gymnasium as gym
+-import os
+-import torch
+-from datetime import datetime
+-
+-from rsl_rl.runners import OnPolicyRunner
+-
+-from omni.isaac.lab.envs import (
+-    DirectMARLEnv,
+-    DirectMARLEnvCfg,
+-    DirectRLEnvCfg,
+-    ManagerBasedRLEnvCfg,
+-    multi_agent_to_single_agent,
+-)
+-from omni.isaac.lab.utils.dict import print_dict
+-from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
+-
+-# import omni.isaac.lab_tasks  # noqa: F401
+-import sys, os
+-sys.path.append(os.getcwd())
+-# Import extensions to set up environment tasks
+-import tim.tasks # noqa: F401
+-
+-
+-from omni.isaac.lab_tasks.utils import get_checkpoint_path
+-from omni.isaac.lab_tasks.utils.hydra import hydra_task_config
+-from omni.isaac.lab_tasks.utils.wrappers.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper
+-
+-torch.backends.cuda.matmul.allow_tf32 = True
+-torch.backends.cudnn.allow_tf32 = True
+-torch.backends.cudnn.deterministic = False
+-torch.backends.cudnn.benchmark = False
+-
+-
+-@hydra_task_config(args_cli.task, "rsl_rl_cfg_entry_point")
+-def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlOnPolicyRunnerCfg):
+-    """Train with RSL-RL agent."""
+-    # override configurations with non-hydra CLI arguments
+-    agent_cfg = cli_args_isaac.update_rsl_rl_cfg(agent_cfg, args_cli)
+-    env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
+-    agent_cfg.max_iterations = (
+-        args_cli.max_iterations if args_cli.max_iterations is not None else agent_cfg.max_iterations
+-    )
+-
+-    # set the environment seed
+-    # note: certain randomizations occur in the environment initialization so we set the seed here
+-    env_cfg.seed = agent_cfg.seed
+-    env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
+-
+-    # specify directory for logging experiments
+-    log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
+-    log_root_path = os.path.abspath(log_root_path)
+-    print(f"[INFO] Logging experiment in directory: {log_root_path}")
+-    # specify directory for logging runs: {time-stamp}_{run_name}
+-    log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+-    if agent_cfg.run_name:
+-        log_dir += f"_{agent_cfg.run_name}"
+-    log_dir = os.path.join(log_root_path, log_dir)
+-
+-    # create isaac environment
+-    env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+-
+-    # convert to single-agent instance if required by the RL algorithm
+-    if isinstance(env.unwrapped, DirectMARLEnv):
+-        env = multi_agent_to_single_agent(env)
+-
+-    # save resume path before creating a new log_dir
+-    if agent_cfg.resume:
+-        resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
+-
+-    # wrap for video recording
+-    if args_cli.video:
+-        video_kwargs = {
+-            "video_folder": os.path.join(log_dir, "videos", "train"),
+-            "step_trigger": lambda step: step % args_cli.video_interval == 0,
+-            "video_length": args_cli.video_length,
+-            "disable_logger": True,
+-        }
+-        print("[INFO] Recording videos during training.")
+-        print_dict(video_kwargs, nesting=4)
+-        env = gym.wrappers.RecordVideo(env, **video_kwargs)
+-
+-    # wrap around environment for rsl-rl
+-    env = RslRlVecEnvWrapper(env)
+-
+-    # create runner from rsl-rl
+-    runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
+-    # write git state to logs
+-    runner.add_git_repo_to_log(__file__)
+-    # load the checkpoint
+-    if agent_cfg.resume:
+-        print(f"[INFO]: Loading model checkpoint from: {resume_path}")
+-        # load previously trained model
+-        runner.load(resume_path)
+-
+-    # dump the configuration into log-directory
+-    dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
+-    dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
+-    dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
+-    dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
+-
+-    # run training
+-    runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
+-
+-    # close the simulator
+-    env.close()
+-
+-
+-if __name__ == "__main__":
+-    # run the main function
+-    main()
+-    # close sim app
+-    simulation_app.close()
+\ No newline at end of file
