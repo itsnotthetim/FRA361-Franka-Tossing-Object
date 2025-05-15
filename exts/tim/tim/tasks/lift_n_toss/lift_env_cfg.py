@@ -212,7 +212,7 @@ class RewardsCfg:
     )
     success = RewTerm(
         func=mdp.success_bonus,
-        params={"eps": 0.05},
+        params={"eps": 0.1},
         weight=2000.0
     )
 

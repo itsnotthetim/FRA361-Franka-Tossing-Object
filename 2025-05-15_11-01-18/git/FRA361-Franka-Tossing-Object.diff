@@ -1,0 +1,26 @@
+--- git status ---
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py
+
+no changes added to commit (use "git add" and/or "git commit -a") 
+
+
+--- git diff ---
+diff --git a/exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py b/exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py
+index 6a4e653..fd9fb3c 100644
+--- a/exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py
++++ b/exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py
+@@ -212,7 +212,7 @@ class RewardsCfg:
+     )
+     success = RewTerm(
+         func=mdp.success_bonus,
+-        params={"eps": 0.05},
++        params={"eps": 0.1},
+         weight=2000.0
+     )
+ 
