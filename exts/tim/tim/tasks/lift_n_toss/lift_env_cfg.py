@@ -245,25 +245,25 @@ class RewardsCfg:
 
     hold_penalty = RewTerm(
     func=mdp.hold_penalty,
-    params={
-        "beta": 0.01,               # tune: 0.005–0.02 typical
-        "minimal_height": 0.04,
-        "gripper_cfg": SceneEntityCfg("robot"),
-        "object_cfg" : SceneEntityCfg("object"),
-        "grasp_threshold": 0.07,
-    },
-    weight=1.0          # keep weight = 1.0 because beta already sets magnitude
-)
+        params={
+            "beta": 0.01,               # tune: 0.005–0.02 typical
+            "minimal_height": 0.04,
+            "gripper_cfg": SceneEntityCfg("robot"),
+            "object_cfg" : SceneEntityCfg("object"),
+            "grasp_threshold": 0.07,
+        },
+        weight=1.0          # keep weight = 1.0 because beta already sets magnitude
+    )
     release_success = RewTerm(
-    func   = mdp.release_success,
-    params = {
-        "launch_height": 0.08,          # tune as you like
-        "grasp_threshold": 0.07,
-        "object_cfg":  SceneEntityCfg("object"),
-        "gripper_cfg": SceneEntityCfg("robot"),
-    },
-    weight = 100.0                      # or any scalar to set its value
-)
+        func=mdp.release_success,
+        params={
+            "launch_height": 0.08,          # tune as you like
+            "grasp_threshold": 0.07,
+            "object_cfg":  SceneEntityCfg("object"),
+            "gripper_cfg": SceneEntityCfg("robot"),
+        },
+        weight = 100.0                      # or any scalar to set its value
+    )
 
 @configclass
 class TerminationsCfg:

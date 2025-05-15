@@ -109,13 +109,17 @@ def main():
                     # print("Randomized object position:", cube_position)
             basket_pos = basket_position.tolist()
 
-            print(
-                f"ee_pos:   {ee_current_pos}\n"
-                f"cube_pos: {cube_pos}\n"
-                f"cube_height: {height}\n"
-                f"basket_pos: {basket_pos}"
-            )
+            # print(
+            #     f"ee_pos:   {ee_current_pos}\n"
+            #     f"cube_pos: {cube_pos}\n"
+            #     f"cube_height: {height}\n"
+            #     f"basket_pos: {basket_pos}"
+            # )
             
+            # final_pos = env.scene["object"].data.root_state_w[:, :3]
+            # goal_pos  = env.scene["basket"].data.root_state_w[:, :3]
+
+            # print(torch.linalg.norm(final_pos - goal_pos))
         
 
             count += 1

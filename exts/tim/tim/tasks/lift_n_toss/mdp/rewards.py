@@ -226,19 +226,37 @@ def acc_term(
     return -k_acc * err2 * mask.to(err2.dtype)                      # (N,)
 
 
-def success_bonus(env: ManagerBasedRLEnv, eps: float) -> torch.Tensor:
-    """
-    Success bonus: if final object within eps of goal, only at terminal timestep.
-    """
-    final_pos = env.scene["object"].data.root_state_w[:, :3]
-    goal_pos  = env.scene["basket"].data.root_state_w[:, :3]
+# def success_bonus(env: ManagerBasedRLEnv, eps: float) -> torch.Tensor:
+#     """
+#     Success bonus: if final object within eps of goal, only at terminal timestep.
+#     """
+#     final_pos = env.scene["object"].data.root_state_w[:, :3]
+#     goal_pos  = env.scene["basket"].data.root_state_w[:, :3]
 
-    dist = torch.linalg.norm(final_pos - goal_pos, dim=-1)        # (N,)
-    succ = (dist < eps).to(dist.dtype)                            # (N,) → 0.0 or 1.0
-    done = env.termination_manager.dones.to(dist.dtype)           # (N,) → 0.0 or 1.0
+#     dist = torch.linalg.norm(final_pos - goal_pos, dim=-1)        # (N,)
+#     succ = (dist < eps).to(dist.dtype)                            # (N,) → 0.0 or 1.0
+#     done = env.termination_manager.dones.to(dist.dtype)           # (N,) → 0.0 or 1.0
 
-    # only pay out the bonus at the end
-    return succ * done
+#     # only pay out the bonus at the end
+#     return succ * done
+
+def success_bonus(
+    env: ManagerBasedRLEnv,
+    eps: float
+) -> torch.Tensor:
+    """
+    Success bonus: per-step indicator (0.0 or 1.0) of whether the
+    object’s current position is within eps of the basket.
+    """
+    # Current object and basket positions in world frame
+    final_pos = env.scene["object"].data.root_state_w[:, :3]  # (N,3)
+    goal_pos  = env.scene["basket"].data.root_state_w[:, :3]  # (N,3)
+
+    # Compute distance and threshold test
+    dist = torch.linalg.norm(final_pos - goal_pos, dim=-1)    # (N,)
+    succ = (dist < eps).to(dist.dtype)                        # (N,) → 1.0 if within eps, else 0.0
+
+    return succ
 
 # def energy_penalty(env: ManagerBasedRLEnv, alpha: float) -> torch.Tensor:
 #     v = env.scene["robot"].data.joint_vel  # (N, J)
