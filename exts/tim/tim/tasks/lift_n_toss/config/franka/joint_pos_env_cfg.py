@@ -77,7 +77,7 @@ class FrankaCubeLiftEnvCfg(LiftEnvCfg):
         self.scene.basket = RigidObjectCfg(
                 prim_path="{ENV_REGEX_NS}/BasketObject",
                 init_state=RigidObjectCfg.InitialStateCfg(
-                    pos=[1.5, 0.0, 0.2],
+                    pos=[1.3, 0.0, 0.1],
                     rot=[1, 0, 0, 0]
                 ),
                 spawn=UsdFileCfg(

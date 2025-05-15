@@ -102,22 +102,98 @@ def object_ee_distance(
 
 ## Tossing
 
-def acc_term(env: ManagerBasedRLEnv, k_acc: float) -> torch.Tensor:
+# def acc_term(env: ManagerBasedRLEnv, k_acc: float) -> torch.Tensor:
+#     """
+#     Accuracy term: −k_acc * ||p_final − p_goal||^2, but only applied at the final timestep.
+#     """
+#     # final object position in world frame
+#     final_pos = env.scene["object"].data.root_state_w[:, :3]
+#     # basket goal position in world frame
+#     goal_pos = env.scene["basket"].data.root_state_w[:, :3]
+#     # squared error
+#     err2 = torch.sum((final_pos - goal_pos) ** 2, dim=-1)
+
+#     # get a (N,) bool tensor which envs just terminated
+#     done = env.termination_manager.dones
+
+#     # apply the penalty only for envs where done==True
+#     return torch.where(done, -k_acc * err2, torch.zeros_like(err2))
+
+## done active
+# def acc_term(
+#     env: ManagerBasedRLEnv,
+#     k_acc: float,
+#     gripper_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+#     object_cfg:  SceneEntityCfg  = SceneEntityCfg("object"),
+#     basket_cfg:  SceneEntityCfg  = SceneEntityCfg("basket"),
+#     minimal_height: float        = 0.04,
+#     grasp_threshold: float       = 0.07,
+# ) -> torch.Tensor:
+#     """
+#     Accuracy term: −k_acc * ||p_final − p_goal||^2, applied only if:
+#       1) the episode just terminated,
+#       2) the gripper was open at termination (i.e. object released),
+#       3) the object was airborne (height > minimal_height) at termination.
+#     Otherwise returns zero.
+#     """
+#     # final object & basket positions
+#     final_pos = env.scene[object_cfg.name].data.root_state_w[:, :3]   # (N,3)
+#     goal_pos  = env.scene[basket_cfg.name].data.root_state_w[:, :3]   # (N,3)
+
+#     # squared distance error
+#     err2 = torch.sum((final_pos - goal_pos) ** 2, dim=-1)             # (N,)
+
+#     # episode done mask
+#     done = env.termination_manager.dones                               # (N,)
+
+#     # gripper-open mask
+#     fingers    = env.scene[gripper_cfg.name].data.joint_pos[:, -2:]    # (N,2)
+#     gap        = fingers.sum(dim=1)                                    # (N,)
+#     open_grip  = gap > grasp_threshold                                # (N,)
+
+#     # airborne mask
+#     height     = final_pos[:, 2]                                       # (N,)
+#     airborne   = height > minimal_height                              # (N,)
+
+#     # only penalize true throws (done & open & airborne)
+#     mask = done & open_grip & airborne                                # (N,)
+
+#     # apply penalty where mask is true
+#     return torch.where(mask, -k_acc * err2, torch.zeros_like(err2))
+
+def acc_term(
+    env: ManagerBasedRLEnv,
+    k_acc: float,
+    gripper_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    object_cfg : SceneEntityCfg = SceneEntityCfg("object"),
+    basket_cfg : SceneEntityCfg = SceneEntityCfg("basket"),
+    minimal_height: float       = 0.04,
+    grasp_threshold: float      = 0.07,
+) -> torch.Tensor:
     """
-    Accuracy term: −k_acc * ||p_final − p_goal||^2, but only applied at the final timestep.
+    Continuous accuracy penalty:  −k_acc · ||p_obj − p_goal||²
+    active at every step **after** the object has been released
+    (gripper open) and is airborne (height > minimal_height).
     """
-    # final object position in world frame
-    final_pos = env.scene["object"].data.root_state_w[:, :3]
-    # basket goal position in world frame
-    goal_pos = env.scene["basket"].data.root_state_w[:, :3]
+    # positions
+    p_obj  = env.scene[object_cfg.name ].data.root_state_w[:, :3]   # (N,3)
+    p_goal = env.scene[basket_cfg.name].data.root_state_w[:, :3]    # (N,3)
+
     # squared error
-    err2 = torch.sum((final_pos - goal_pos) ** 2, dim=-1)
+    err2 = torch.sum((p_obj - p_goal)**2, dim=1)                    # (N,)
 
-    # get a (N,) bool tensor which envs just terminated
-    done = env.termination_manager.dones
+    # gripper-open mask
+    fingers = env.scene[gripper_cfg.name].data.joint_pos[:, -2:]    # (N,2)
+    gap     = fingers.sum(dim=1)
+    open_grip = gap > grasp_threshold                               # (N,)
 
-    # apply the penalty only for envs where done==True
-    return torch.where(done, -k_acc * err2, torch.zeros_like(err2))
+    # airborne mask
+    airborne = p_obj[:, 2] > minimal_height                         # (N,)
+
+    # activate penalty only if released & airborne
+    mask = open_grip & airborne                                     # (N,)
+
+    return -k_acc * err2 * mask.to(err2.dtype)                      # (N,)
 
 
 def success_bonus(env: ManagerBasedRLEnv, eps: float) -> torch.Tensor:
@@ -178,4 +254,45 @@ def throw_prep(
     return throw_reward
 
 
+def release_bonus(
+    env: ManagerBasedRLEnv,
+    basket_cfg: SceneEntityCfg = SceneEntityCfg("basket"),
+    gripper_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    minimal_height: float = 0.04,
+    grasp_threshold: float = 0.07,
+    release_radius: float = 0.05,
+) -> torch.Tensor:
+    """
+    Reward the agent for releasing the object near the basket:
+      – Only at the terminal step (done)
+      – Only if the gripper is open (gap > grasp_threshold)
+      – Only if the object was airborne (height > minimal_height)
+      – Only if the final object position is within release_radius of the basket
+    Returns a (N,) tensor of 1.0 where all conditions are met, else 0.0.
+    """
+    # 1) Episode done
+    done = env.termination_manager.dones  # (N,)
+
+    # 2) Gripper-open mask (direct syntax)
+    robot   = env.scene[gripper_cfg.name]
+    fingers = robot.data.joint_pos[:, -2:]         # (N,2)
+    gap     = fingers.sum(dim=1)                   # (N,)
+    open_grip = gap > grasp_threshold              # (N,)
+
+    # 3) Object airborne mask
+    obj = env.scene["object"]
+    pos = obj.data.root_pos_w[:, :3]               # (N,3)
+    height = pos[:, 2]                             # (N,)
+    airborne = height > minimal_height             # (N,)
+
+    # 4) Near-basket mask
+    basket = env.scene[basket_cfg.name]
+    goal_pos = basket.data.root_pos_w[:, :3]       # (N,3)
+    dist = torch.norm(pos - goal_pos, dim=1)       # (N,)
+    near_basket = dist < release_radius            # (N,)
+
+    # 5) Combine all conditions
+    mask = done & open_grip & airborne & near_basket
+
+    return mask.to(torch.float32)  
 

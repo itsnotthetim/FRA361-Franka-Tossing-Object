@@ -136,12 +136,22 @@ class ObservationsCfg:
 class EventCfg:
     """Configuration for events."""
 
-    set_object_mass = EventTerm(
+    set_basket_mass = EventTerm(
         func=mdp.randomize_rigid_body_mass,
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("basket", body_names=["Cube_006"]),
             "mass_distribution_params": (3.0, 3.0),  # fixed mass explicitly at 1.5 kg
+            "operation": "abs",  # correctly set absolute mass
+        },
+    )
+
+    set_object_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("object", body_names=["Object"]),
+            "mass_distribution_params": (0.1, 0.1),  # fixed mass explicitly at 1.5 kg
             "operation": "abs",  # correctly set absolute mass
         },
     )
@@ -180,20 +190,20 @@ class RewardsCfg:
     
     # Phase I: lift accuracy (dense penalty) + success bonus (sparse)
         
-    reaching_object = RewTerm(func=mdp.object_ee_distance, params={"std": 0.1}, weight=2.0)
+    reaching_object = RewTerm(func=mdp.object_ee_distance, params={"std": 0.1}, weight=1.0)
 
-    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=12.5) # old is 15.0
+    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=15.0) # old is 15.0
 
     # Phase II: throw accuracy (dense penalty) + success bonus (sparse)
     accuracy = RewTerm(
         func=mdp.acc_term,
         params={"k_acc": 1.0}, # old is 2.0
-        weight=10.0 #old is 20.0
+        weight=50.0 #old is 500.0
     )
     success = RewTerm(
         func=mdp.success_bonus,
         params={"eps": 0.05},
-        weight=1000.0
+        weight=2000.0
     )
 
     # # Smoothness regulariser (small penalty on joint velocities)
@@ -220,9 +230,21 @@ class RewardsCfg:
             "object_cfg": SceneEntityCfg("object"),
             "gripper_cfg": SceneEntityCfg("robot"),
         },
-        weight=4.0  # Adjust weight as needed
+        weight=2.5  # Adjust weight as needed
     )
 
+     # new release bonus term
+    # release_bonus = RewTerm(
+    #     func=mdp.release_bonus,
+    #     params={
+    #         "basket_cfg": SceneEntityCfg("basket"),
+    #         "gripper_cfg": SceneEntityCfg("robot"),
+    #         "minimal_height": 0.04,
+    #         "grasp_threshold": 0.07,
+    #         "release_radius": 0.5,
+    #     },
+    #     weight=10.0,   # tune this up or down to control its impact
+    # )
 
 @configclass
 class TerminationsCfg:

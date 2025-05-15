@@ -95,11 +95,15 @@ def main():
             # step the environment
             obs, rew, terminated, truncated, info = env.step(joint_efforts)
 
+            # robot_pos = robot_entity.data.root_pos_w[0].cpu().numpy
+
             ee_current_pos = robot_entity.data.body_state_w[0, ee_idx, :3].cpu().numpy()
 
             cube_position = cube_entity.data.root_pos_w[0].cpu().numpy()
                     # print("Randomized object position:", cube_position)
             cube_pos = cube_position.tolist()
+
+            height = cube_entity.data.root_pos_w[:, 2]
 
             basket_position = basket_entity.data.root_pos_w[0].cpu().numpy()
                     # print("Randomized object position:", cube_position)
@@ -108,6 +112,7 @@ def main():
             print(
                 f"ee_pos:   {ee_current_pos}\n"
                 f"cube_pos: {cube_pos}\n"
+                f"cube_height: {height}\n"
                 f"basket_pos: {basket_pos}"
             )
             
