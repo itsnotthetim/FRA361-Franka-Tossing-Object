@@ -12,6 +12,8 @@
 
 This repository serves as a template for building projects or extensions based on Isaac Lab. It allows you to develop in an isolated environment, outside of the core Isaac Lab repository.
 
+**This project use rsl-rl 2.0.2 and IsaacLab 4.2.0**
+
 **Key Features:**
 
 - `Isolation` Work outside the core Isaac Lab repository, ensuring that your development efforts remain self-contained.
