@@ -194,6 +194,7 @@ class RewardsCfg:
 
     lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=8.0) # old is 15.0
 
+
     # Phase II: throw accuracy (dense penalty) + success bonus (sparse)
     accuracy = RewTerm(
         func=mdp.acc_term,

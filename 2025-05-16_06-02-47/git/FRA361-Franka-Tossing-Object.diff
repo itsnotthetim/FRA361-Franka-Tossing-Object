@@ -1,0 +1,115 @@
+--- git status ---
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py
+
+no changes added to commit (use "git add" and/or "git commit -a") 
+
+
+--- git diff ---
+diff --git a/exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py b/exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py
+index 1a982d1..0f0af1c 100644
+--- a/exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py
++++ b/exts/tim/tim/tasks/lift_n_toss/lift_env_cfg.py
+@@ -192,13 +192,14 @@ class RewardsCfg:
+         
+     reaching_object = RewTerm(func=mdp.object_ee_distance, params={"std": 0.1}, weight=1.0)
+ 
+-    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=8.0) # old is 15.0
++    lifting_object = RewTerm(func=mdp.object_is_lifted, params={"minimal_height": 0.04}, weight=15.0) 
++
+ 
+     # Phase II: throw accuracy (dense penalty) + success bonus (sparse)
+     accuracy = RewTerm(
+         func=mdp.acc_term,
+-        params={"k_acc": 1.0}, # old is 2.0
+-        weight=50.0 #old is 500.0
++        params={"k_acc": 1.0}, 
++        weight=50.0 
+     )
+     success = RewTerm(
+         func=mdp.success_bonus,
+@@ -213,15 +214,6 @@ class RewardsCfg:
+     #     weight=1.0
+     # )
+ 
+-    # action penalty
+-    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-1e-4)
+-
+-    joint_vel = RewTerm(
+-        func=mdp.joint_vel_l2,
+-        weight=-1e-4,
+-        params={"asset_cfg": SceneEntityCfg("robot")},
+-    )
+-
+     throw_prep = RewTerm(
+         func=mdp.throw_prep,
+         params={
+@@ -230,31 +222,42 @@ class RewardsCfg:
+             "object_cfg": SceneEntityCfg("object"),
+             "gripper_cfg": SceneEntityCfg("robot"),
+         },
+-        weight=2.0  # Adjust weight as needed
++        weight=2.0
+     )
+ 
+-    hold_penalty = RewTerm(
+-    func=mdp.hold_penalty,
+-        params={
+-            "beta": 0.01,               # tune: 0.005–0.02 typical
+-            "minimal_height": 0.04,
+-            "gripper_cfg": SceneEntityCfg("robot"),
+-            "object_cfg" : SceneEntityCfg("object"),
+-            "grasp_threshold": 0.07,
+-        },
+-        weight=1.0          # keep weight = 1.0 because beta already sets magnitude
+-    )
+-    release_success = RewTerm(
+-        func=mdp.release_success,
+-        params={
+-            "launch_height": 0.08,          # tune as you like
+-            "grasp_threshold": 0.07,
+-            "object_cfg":  SceneEntityCfg("object"),
+-            "gripper_cfg": SceneEntityCfg("robot"),
+-        },
+-        weight = 100.0                      # or any scalar to set its value
++    # action penalty
++    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-1e-4)
++
++    joint_vel = RewTerm(
++        func=mdp.joint_vel_l2,
++        weight=-1e-4,
++        params={"asset_cfg": SceneEntityCfg("robot")},
+     )
+ 
++    
++
++    # hold_penalty = RewTerm(
++    # func=mdp.hold_penalty,
++    #     params={
++    #         "beta": 0.01,               # tune: 0.005–0.02 typical
++    #         "minimal_height": 0.04,
++    #         "gripper_cfg": SceneEntityCfg("robot"),
++    #         "object_cfg" : SceneEntityCfg("object"),
++    #         "grasp_threshold": 0.07,
++    #     },
++    #     weight=1.0          # keep weight = 1.0 because beta already sets magnitude
++    # )
++    # release_success = RewTerm(
++    #     func=mdp.release_success,
++    #     params={
++    #         "launch_height": 0.08,          # tune as you like
++    #         "grasp_threshold": 0.07,
++    #         "object_cfg":  SceneEntityCfg("object"),
++    #         "gripper_cfg": SceneEntityCfg("robot"),
++    #     },
++    #     weight = 100.0                      # or any scalar to set its value
++    # )
++
+ @configclass
+ class TerminationsCfg:
+     """Termination terms for the MDP."""
